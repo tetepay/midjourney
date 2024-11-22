@@ -4,6 +4,7 @@ import { NSpin } from 'naive-ui'
 import pkg from '../../../../package.json'
 import { fetchChatConfig ,getLastVersion} from '@/api'
 import { useAuthStore } from '@/store'
+import { gptUsage  } from "@/api";
 
 interface ConfigState {
   timeoutMs?: number
@@ -12,6 +13,8 @@ interface ConfigState {
   socksProxy?: string
   httpsProxy?: string
   usage?: string
+  remaining?: string
+  hard_limit_usd?: string
 }
 
 const authStore = useAuthStore()
@@ -26,8 +29,20 @@ const isChatGPTAPI = computed<boolean>(() => !!authStore.isChatGPTAPI)
 async function fetchConfig() {
   try {
     loading.value = true
-    const { data } = await fetchChatConfig<ConfigState>()
-    config.value = data
+    // const { data } = await fetchChatConfig<ConfigState>()
+    // config.value = data
+    
+
+    const dd= await gptUsage();
+    config.value= {usage:dd.usage?`${dd.usage}`:'-'
+      ,remaining:dd.remaining?`${dd.remaining}`:'-'
+      ,hard_limit_usd:dd.hard_limit_usd?`${dd.hard_limit_usd}`:'-'
+      , "apiModel": "ChatGPTAPI",
+        "reverseProxy": "-",
+        "timeoutMs": 100000,
+        "socksProxy": "-",
+        "httpsProxy": "-", } ;
+
   }
   finally {
     loading.value = false
@@ -67,35 +82,31 @@ const  isShow = computed(()=>{
     <div class="p-4 space-y-4">
       <h2 class="text-xl font-bold">
         Version - {{ pkg.version }}
-        <a class="text-red-500" href="https://github.com/Dooy/chatgpt-web-midjourney-proxy" target="_blank" v-if=" isShow  "> (发现更新版本 {{ st.lastVersion }})</a>
-        <a class="text-gray-500" href="https://github.com/Dooy/chatgpt-web-midjourney-proxy" target="_blank" v-else-if="st.lastVersion"> (已是最新版本)</a>
+        <a class="text-red-500" href="https://github.com/Dooy/chatgpt-web-midjourney-proxy" target="_blank" v-if=" isShow  "> ({{ $t('mj.findVersion') }} {{ st.lastVersion }})</a>
+        <a class="text-gray-500" href="https://github.com/Dooy/chatgpt-web-midjourney-proxy" target="_blank" v-else-if="st.lastVersion"> ({{ $t('mj.yesLastVersion') }})</a>
       </h2>
       <div class="p-2 space-y-2 rounded-md bg-neutral-100 dark:bg-neutral-700">
-        <p>
-          此项目开源于
-          <a
-            class="text-blue-600 dark:text-blue-500"
-            href="https://github.com/Dooy/chatgpt-web-midjourney-proxy"
-            target="_blank"
-          >
-            GitHub
-          </a>
-          ，免费且基于 MIT 协议，没有任何形式的付费行为！
-        </p>
-        <p>
-          如果你觉得此项目对你有帮助，请在 GitHub 帮我点个 Star 或者给予一点赞助，谢谢！
-        </p>
+        <p v-html="$t('mj.infoStar')"></p>
       </div>
       <p>{{ $t("setting.api") }}：{{ config?.apiModel ?? '-' }}</p>
-      <p v-if="isChatGPTAPI">
+      <p v-if="isChatGPTAPI" class=" flex items-center justify-between">
+        <div>
         {{ $t("setting.monthlyUsage") }}：{{ config?.usage ?? '-' }}
+        </div>
+        <div>
+        {{ $t("mj.totalUsage") }}：{{ config?.hard_limit_usd ?(+config?.hard_limit_usd).toFixed(2): '-' }}
+        </div>
+        <div>
+        {{ $t("setting.balance") }}：{{ config?.remaining ?? '-' }}
+        </div>
       </p>
       <p v-if="!isChatGPTAPI">
         {{ $t("setting.reverseProxy") }}：{{ config?.reverseProxy ?? '-' }}
       </p>
-      <p>{{ $t("setting.timeout") }}：{{ config?.timeoutMs ?? '-' }}</p>
-      <p>{{ $t("setting.socks") }}：{{ config?.socksProxy ?? '-' }}</p>
-      <p>{{ $t("setting.httpsProxy") }}：{{ config?.httpsProxy ?? '-' }}</p>
+       
+      <!-- <p>{{ $t("setting.timeout") }}：{{ config?.timeoutMs ?? '-' }}</p>  -->
+      <!-- <p>{{ $t("setting.socks") }}：{{ config?.socksProxy ?? '-' }}</p>
+      <p>{{ $t("setting.httpsProxy") }}：{{ config?.httpsProxy ?? '-' }}</p> -->
     </div>
   </NSpin>
 </template>

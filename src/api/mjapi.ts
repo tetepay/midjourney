@@ -1,10 +1,11 @@
 
  //import { useChat } from '@/views/chat/hooks/useChat'
 
-import { gptConfigStore, gptServerStore, homeStore } from "@/store";
+import { gptConfigStore, gptServerStore, homeStore, useAuthStore } from "@/store";
 import { copyToClip } from "@/utils/copy";
 import { isNumber } from "@/utils/is";
 import { localGet, localSaveAny } from "./mjsave";
+import { t } from "@/locales";
 //import { useMessage } from "naive-ui";
 export interface gptsType{
     gid:string
@@ -12,24 +13,23 @@ export interface gptsType{
     logo:string
     info:string
     use_cnt?:string
+    bad?:string|number
 }
  //const { addChat, updateChat, updateChatSome, getChatByUuidAndIndex } = useChat()
 export function upImg(file:any   ):Promise<any>
 {
+    const maxSize= homeStore.myData.session.uploadImgSize? (+homeStore.myData.session.uploadImgSize):1
     return new Promise((h,r)=>{
-        //const file = input.target.files[0];
         const filename = file.name;
-        //console.log('selectFile', file )
-        if(file.size>(1024*1024)){
-            //msgRef.value.showError('图片大小不能超过1M');
-            r('图片大小不能超过1M')
+        if(file.size>(1024*1024 * maxSize)){
+            r(t('mjchat.no1m',{m:maxSize}))
             return ;
         }
         if (! (filename.endsWith('.jpg') ||
             filename.endsWith('.gif') ||
             filename.endsWith('.png') ||
             filename.endsWith('.jpeg') )) {
-            r('图片仅支持jpg,gif,png,jpeg格式');
+            r(t('mjchat.imgExt') );
             return ;
         }
         const reader = new FileReader();
@@ -39,6 +39,11 @@ export function upImg(file:any   ):Promise<any>
         reader.readAsDataURL(file);
     })
     
+}
+
+export const clearImageBase64= ( str:string)=>{
+    let arr= str.split('base64,',2 )
+    return arr[1]??arr[0];
 }
 
 export const file2blob= (selectedFile: any  )=>{
@@ -89,7 +94,7 @@ export  async function train( text:string){
 
 
         if( text.trim()  =='') {
-           reject('请填写提示词！');
+           reject( t('mjchat.placeInput'));
             return ;
         }
 
@@ -120,8 +125,18 @@ export const mlog = (msg: string, ...args: unknown[]) => {
     console.log(`%c[mjgpt]`,  style, msg , ...args)
 }
 
+export const myTrim = (str: string, delimiter: string)=>{
+    // 构建正则表达式，使用动态的定界符
+    const regex = new RegExp(`^${delimiter}+|${delimiter}+$`, 'g');
+    
+    // 使用正则表达式去除字符串两端的定界符
+    return str.replace(regex, '');
+}
+
 function getHeaderApiSecret(){
     if(!gptServerStore.myData.MJ_API_SECRET){
+        const authStore = useAuthStore()
+        if( authStore.token ) return { 'x-ptoken':  authStore.token };
         return {}
     }
     return {
@@ -138,9 +153,33 @@ const getUrl=(url:string)=>{
 }
 
 export const mjFetch=(url:string,data?:any)=>{
-    mlog('mjFetch', url  );
+    mlog('mjFetch2024', url  );
     let header = {'Content-Type':'application/json'};
     header= {...header,...getHeaderApiSecret() }
+
+    return new Promise<any>((resolve, reject) => {
+        let opt:RequestInit ={method:'GET'}; 
+        opt.headers=header;
+        if(data) {
+            opt.body= JSON.stringify(data) ;
+             opt.method='POST';
+        }
+        fetch(getUrl(url),  opt )
+        .then(d2=>d2.json().then(d=> {
+                if(d2.ok) resolve(d);
+                else{
+                    reject({error: d.error??  (d??'Network response was not ok!'),code:'response_fail',url:getUrl(url), status:d2.status })
+                }
+            }).catch(e=>reject({error:e? e.toString() :'json_error',code:'json_error',url:getUrl(url) , status:d2.status  }))
+        ).catch(e=>reject({error:e? e.toString() :'fetch fail',data ,code:'fetch_fail',url:getUrl(url)  }))
+    })
+     
+}
+
+export const myFetch=(url:string,data?:any)=>{
+    //mlog('myFetch', url  );
+    let header = {'Content-Type':'application/json'};
+    //header= {...header  }
 
     return new Promise<any>((resolve, reject) => {
         let opt:RequestInit ={method:'GET'}; 
@@ -156,8 +195,7 @@ export const mjFetch=(url:string,data?:any)=>{
     })
      
 }
-
-export const myFetch=(url:string,data?:any)=>{
+export const my2Fetch=(url:string,data?:any)=>{
     mlog('mjFetch', url  );
     let header = {'Content-Type':'application/json'};
     //header= {...header  }
@@ -169,7 +207,7 @@ export const myFetch=(url:string,data?:any)=>{
             opt.body= JSON.stringify(data) ;
              opt.method='POST';
         }
-        fetch(getUrl(url),  opt )
+        fetch((url),  opt )
         .then(d=>d.json().then(d=> resolve(d))
         .catch(e=>reject(e)))
         .catch(e=>reject(e))
@@ -201,58 +239,76 @@ export const flechTask= ( chat:Chat.Chat)=>{
            
             setTimeout(() =>   check( ) , 5000 )
         } 
-        mlog('task', ts.progress,ts );
+        mlog('task', ts.progress,ts, chat.uuid,chat.index  );
     }
     check();
 }
 export const subTask= async (data:any, chat:Chat.Chat )=>{
    let d:any;
-   if(  data.action &&data.action=='change' ){ //执行变化
-     d=  await mjFetch('/mj/submit/change' , data.data  );
-   }else if( data.action &&data.action=='mask') { //局部重绘
-     d =  await mjFetch('/mj/submit/action' , data.data  );
-     if(d.result){
-        let bdata= data.maskData;
-        bdata.taskId= d.result;
-        d=  await mjFetch('/mj/submit/modal' , bdata );
-     }
-   }else if( data.action &&data.action=='blend') { //blend
-       d=  await mjFetch('/mj/submit/blend' ,  data.data );
-   }else if( data.action &&data.action=='face') { //换脸 
-      d=  await mjFetch('/mj/insight-face/swap' , data.data  ); 
-      //mlog('换年服务', data.data );
-      //return; 
-   }else if( data.action &&data.action=='img2txt') { //图生文 
-        d=  await mjFetch('/mj/submit/describe' , data.data  ); 
-   }else if( data.action &&data.action=='changeV2') { //执行动作！
-     d=  await mjFetch('/mj/submit/action' , data.data  );
-   }else {
-    let toData =  {
-        "base64Array":data.fileBase64??[],
-        "notifyHook": "",
-        "prompt": data.drawText,
-        "state": "",
-        botType:'MID_JOURNEY'
-        };
-        if(data.bot && data.bot=='NIJI_JOURNEY'){
-            toData.botType= data.bot;
+   try{
+    //return ;
+    if(  data.action &&data.action=='change' ){ //执行变化
+        d=  await mjFetch('/mj/submit/change' , data.data  );
+    }else if( data.action &&data.action=="CustomZoom") { //自定义变焦
+            d =  await mjFetch('/mj/submit/action' , data.data  );
+            if(d.result){
+                let bdata= data.maskData;
+                bdata.taskId= d.result;
+                d=  await mjFetch('/mj/submit/modal' , bdata );
+            }
+    }else if( data.action &&data.action=='mask') { //局部重绘
+        d =  await mjFetch('/mj/submit/action' , data.data  );
+        if(d.result){
+            let bdata= data.maskData;
+            bdata.taskId= d.result;
+            d=  await mjFetch('/mj/submit/modal' , bdata );
         }
-        d=  await mjFetch('/mj/submit/imagine' ,toData );
-        mlog('submit',d );
-        //return ;
+    }else if( data.action &&data.action=='blend') { //blend
+        d=  await mjFetch('/mj/submit/blend' ,  data.data );
+    }else if( data.action &&data.action=='shorten') { //shorten 
+        d=  await mjFetch('/mj/submit/shorten' ,  data.data );
+        //  mlog('mjFetch shorten' , data );
+    }else if( data.action &&data.action=='face') { //换脸 
+        d=  await mjFetch('/mj/insight-face/swap' , data.data  ); 
+        //mlog('换年服务', data.data );
+        //return; 
+    }else if( data.action &&data.action=='img2txt') { //图生文 
+            d=  await mjFetch('/mj/submit/describe' , data.data  ); 
+    }else if( data.action &&data.action=='changeV2') { //执行动作！
+        d=  await mjFetch('/mj/submit/action' , data.data  );
+    }else {
+        let toData =  {
+            "base64Array":data.fileBase64??[],
+            "notifyHook": "",
+            "prompt": data.drawText,
+            "state": "",
+            botType:'MID_JOURNEY'
+            };
+            if(data.bot && data.bot=='NIJI_JOURNEY'){
+                toData.botType= data.bot;
+            }
+            d=  await mjFetch('/mj/submit/imagine' ,toData );
+            mlog('submit',d );
+            //return ;
+    }
+    if(d.code==21){
+        d=  await mjFetch('/mj/submit/modal' , { taskId:d.result} );
+    }
+        
+     backOpt(d, chat);
+   }catch(e:any ){
+     mlog('mjFetchError', e )
+     chat.text='失败！'+"\n```json\n"+JSON.stringify(e, null, 2)+"\n```\n";
+     chat.loading=false;
+     homeStore.setMyData({act:'updateChat', actData:chat });
    }
-   if(d.code==21){
-       d=  await mjFetch('/mj/submit/modal' , { taskId:d.result} );
-   }
-     
-    backOpt(d, chat);
    
     
     //if( chat.uuid &&  chat.index) updateChat(chat.uuid,chat.index, chat)
 }
 const backOpt= (d:any, chat:Chat.Chat )=>{
-     if(d.code==1){
-        chat.text='提交成功！';
+     if(d.code==1 || d.code==22){
+        chat.text= d.code==22? d.description :'提交成功！';
         chat.mjID= d.result;
         flechTask( chat )
         chat.loading=true;
@@ -314,10 +370,43 @@ export const getLastVersion=  async ()=>{
 }
 
 export const canVisionModel= (model:string)=>{
+    mlog('canVisionModel ',model );
     //['gpt-4-all','gpt-4-v'].indexOf(model)==-1 && model.indexOf('gpt-4-gizmo')==-1
-    if( ['gpt-4-all','gpt-4-v','gpt-4v','gpt-3.5-net'].indexOf(model)>-1 ) return true;
-    if(model.indexOf('gpt-4-gizmo')>-1 )return true; 
+    if( ['gpt-4-all','gpt-4-v','gpt-4v','gpt-3.5-net','gpt-4o-all'].indexOf(model)>-1 ) return true;
+    if(model.indexOf('-all')>-1 )return true; //各种all模型
+    if(model.indexOf('gpt-4-gizmo')>-1 )return true;  // || model.indexOf('claude-3-opus')>-1cha
+     
     return false;
+}
+export const isCanBase64Model=(model:string)=>{
+    //gpt-4o
+    //customVisionModel
+    let arr=['gpt-4o','gemini','1.5','sonnet','opus' ];
+    for( let m of arr){
+        if(model.indexOf(m)>-1) return true
+    }
+    if(model.indexOf('gpt-4o')>-1 || ( model.indexOf('gemini')>-1 && model.indexOf('1.5')>-1 ) ){
+        return true
+    }
+    //if(model.indexOf('sonnet')>-1 ) return true ;
+    let visionArr=['gemini-pro-vision','gpt-4o-2024-08-06','gpt-4o','gpt-4o-2024-05-13','gpt-4o-mini','gpt-4o-mini-2024-07-18','gemini-pro-1.5','gpt-4-turbo','gpt-4-turbo-2024-04-09','gpt-4-vision-preview','luma-video','claude-3-5-sonnet-20240620' ,'claude-3-sonnet-20240229','claude-3-opus-20240229', defaultVisionModel() ]
+    if( homeStore.myData.session.customVisionModel ){ 
+        homeStore.myData.session.customVisionModel.split(/[ ,]+/ig).map( (v:string)=>{
+            visionArr.push( v.toLocaleLowerCase() )
+        });
+    }
+    return visionArr.indexOf(model)>-1
+}
+export const canBase64Model= (model:string)=>{
+    if( isCanBase64Model(model)) return model; 
+   return defaultVisionModel();
+}
+
+export const defaultVisionModel=()=>{
+    if( homeStore.myData.session && homeStore.myData.session.visionModel ){
+        return  homeStore.myData.session.visionModel
+    }
+    return 'gpt-4-vision-preview'
 }
 
 export const isTTS= ( model:string )=>{

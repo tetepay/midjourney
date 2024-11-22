@@ -3,15 +3,24 @@ import type { PluginOption } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 function setupPlugins(env: ImportMetaEnv): PluginOption[] {
   return [
     vue(),
-    env.VITE_GLOB_APP_PWA === 'true' && VitePWA({
+    viteStaticCopy({
+      targets: [
+        {
+          src: path.resolve(__dirname, './src/static/mitf') + '/[!.]*', // 1️⃣
+          dest: './mitf/', // 2️⃣
+        },
+      ],
+    }),
+    VitePWA({ // env.VITE_GLOB_APP_PWA === 'true' &&
       injectRegister: 'auto',
       manifest: {
-        name: 'chatGPT',
-        short_name: 'chatGPT',
+        name: 'chatGPT-MJ',
+        short_name: 'chatGPT-MJ',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
@@ -46,12 +55,32 @@ export default defineConfig((env) => {
           changeOrigin: true, // 允许跨域
           //rewrite: path => path.replace('/api/', '/'),
         },
+         '/sunoapi': {
+          target: viteEnv.VITE_APP_API_BASE_URL,
+          changeOrigin: true, // 允许跨域  
+        },
          '/uploads': {
           target: viteEnv.VITE_APP_API_BASE_URL,
           changeOrigin: true, // 允许跨域
           //rewrite: path => path.replace('/api/', '/'),
         }, 
         '/openapi': {
+          target: viteEnv.VITE_APP_API_BASE_URL,
+          changeOrigin: true, // 允许跨域
+          //rewrite: path => path.replace('/api/', '/'),
+        },
+        '/luma': {
+          target: viteEnv.VITE_APP_API_BASE_URL,
+          changeOrigin: true, // 允许跨域
+          //rewrite: path => path.replace('/api/', '/'),
+        }, 
+        //
+        '/viggle': {
+          target: viteEnv.VITE_APP_API_BASE_URL,
+          changeOrigin: true, // 允许跨域
+          //rewrite: path => path.replace('/api/', '/'),
+        },
+         '/runwayml': {
           target: viteEnv.VITE_APP_API_BASE_URL,
           changeOrigin: true, // 允许跨域
           //rewrite: path => path.replace('/api/', '/'),

@@ -26,6 +26,8 @@ const name = ref(userInfo.value.name ?? '')
 
 const description = ref(userInfo.value.description ?? '')
 
+const backgroundImage = ref(userInfo.value.backgroundImage ?? '')
+
 const language = computed({
   get() {
     return appStore.language
@@ -59,6 +61,9 @@ const languageOptions: { label: string; key: Language; value: Language }[] = [
   { label: 'English', key: 'en-US', value: 'en-US' },
   { label: '한국어', key: 'ko-KR', value: 'ko-KR' },
   { label: 'Русский язык', key: 'ru-RU', value: 'ru-RU' },
+  { label: 'Tiếng Việt', key: 'vi-VN', value: 'vi-VN' },
+  { label: 'Français', key: 'fr-FR', value: 'fr-FR' },
+  { label: 'Türkçe', key: 'tr-TR', value: 'tr-TR' },
 ]
 
 function updateUserInfo(options: Partial<UserInfo>) {
@@ -116,9 +121,8 @@ function clearData(): void {
 }
 
 function handleImportButtonClick(): void {
-  const fileInput = document.getElementById('fileInput') as HTMLElement
-  if (fileInput)
-    fileInput.click()
+  const fileInput = document.getElementById('fileInput2') as HTMLElement
+  if (fileInput)   fileInput.click()
 }
 </script>
 
@@ -140,6 +144,15 @@ function handleImportButtonClick(): void {
           <NInput v-model:value="name" placeholder="" />
         </div>
         <NButton size="tiny" text type="primary" @click="updateUserInfo({ name })">
+          {{ $t('common.save') }}
+        </NButton>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="flex-shrink-0 w-[100px]">{{ $t('setting.backgroundImage') }}</span>
+        <div class="w-[200px]">
+          <NInput v-model:value="backgroundImage" placeholder="" />
+        </div>
+        <NButton size="tiny" text type="primary" @click="updateUserInfo({ backgroundImage })">
           {{ $t('common.save') }}
         </NButton>
       </div>
@@ -166,7 +179,7 @@ function handleImportButtonClick(): void {
             {{ $t('common.export') }}
           </NButton>
 
-          <input id="fileInput" type="file" style="display:none" @change="importData">
+          <input id="fileInput2" type="file" style="display:none" @change="importData">
           <NButton size="small" @click="handleImportButtonClick">
             <template #icon>
               <SvgIcon icon="ri:upload-2-fill" />

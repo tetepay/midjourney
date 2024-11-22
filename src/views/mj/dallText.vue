@@ -2,7 +2,7 @@
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { NImage,NButton,NModal,useMessage } from 'naive-ui'
 import { computed , ref,watch } from 'vue'
-import {  localGet,mlog, url2base64 } from '@/api'
+import {  isDallImageModel, localGet,mlog, url2base64 } from '@/api'
 import { homeStore } from '@/store'
 const { isMobile } = useBasicLayout()
 const st = ref({isLoadImg:false,uri_base64:''})
@@ -10,8 +10,9 @@ const props = defineProps<{chat:Chat.Chat}>();
 const chat = computed(() =>props.chat);
 
 const load = async ()=>{
-     mlog('load', chat.value.myid, chat.value.opt?.imageUrl );
-     if(chat.value.model!='dall-e-3' || !chat.value.myid || !chat.value.opt?.imageUrl ){
+     mlog('load-dall', chat.value.myid, chat.value.opt?.imageUrl );
+     //if(chat.value.model!='dall-e-3' || !chat.value.myid || !chat.value.opt?.imageUrl ){
+     if( !isDallImageModel(chat.value.model)  || !chat.value.myid || !chat.value.opt?.imageUrl ){
          st.value.isLoadImg=true;
       return ;
      }
@@ -58,8 +59,8 @@ load();
         <NImage   v-if="chat.opt?.imageUrl" :src="st.uri_base64?st.uri_base64:chat.opt.imageUrl" class=" rounded-sm " :class="[isMobile?'':'!max-w-[500px]']"  /> 
     </div>
     <div v-else-if="chat.opt?.imageUrl" class="w-[200px] h-[150px] flex flex-col justify-center items-center" >
-        <div class="p-4">正在载入图片</div>
-        <NButton type="primary"  ><a :href="chat.opt?.imageUrl" target="_blank">直接打开链接</a></NButton> 
+        <div class="p-4">{{ $t('mjchat.loading') }}</div>
+        <NButton type="primary"  ><a :href="chat.opt?.imageUrl" target="_blank">{{ $t('mjchat.openurl') }}</a></NButton> 
     </div>
 </div>
 </template>

@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { defaultState, getLocalState, setLocalState } from './helper'
 import { router } from '@/router'
 import { homeStore } from '@/store/homeStore'
+import { sleep } from '@/api/suno'
+import { mlog } from '@/api'
 
 export const useChatStore = defineStore('chat-store', {
   state: (): Chat.ChatState => getLocalState(),
@@ -181,6 +183,14 @@ export const useChatStore = defineStore('chat-store', {
         this.chat[index].data = []
         this.recordState()
       }
+
+      //清空标题
+      const i2= this.history.findIndex( v=>v.uuid===uuid )
+      if (i2 !== -1) {
+        this.history[i2].title= "New Chat"
+         this.recordState()
+      }
+      //end 清空标题
     },
 
     clearHistory() {
@@ -190,7 +200,8 @@ export const useChatStore = defineStore('chat-store', {
 
     async reloadRoute(uuid?: number) {
       this.recordState();
-
+      mlog('toMyuid19','reloadRoute')
+      //await sleep(1000)
       await router.push({ name: homeStore.myData.local=='draw'?'draw': 'Chat', params: { uuid } })
     },
 

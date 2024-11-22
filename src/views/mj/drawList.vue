@@ -8,7 +8,7 @@ import { useChat } from '../chat/hooks/useChat'
 import { useUsingContext } from '../chat/hooks/useUsingContext' 
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { homeStore, useChatStore, usePromptStore } from '@/store'
-import {   mlog,subTask,localSaveAny, subGPT } from '@/api'
+import {   mlog,subTask,localSaveAny, subGPT, isDallImageModel } from '@/api'
 import { t } from '@/locales'
 
 let controller = new AbortController()
@@ -61,14 +61,14 @@ async function onConversation() {
   if (loading.value)
     return
   if( !message.drawText && dataSources.value.length==0){
-      message.drawText='AI绘图';
+      message.drawText=  t('mjset.sysname');//'AI绘图';
   }
 //   if (!message || message.trim() === '')
 //     return
 
   controller = new AbortController()
   if( message.action && message.action=='face' ){
-    let promptMsg: Chat.Chat= getInitChat('换脸');
+    let promptMsg: Chat.Chat= getInitChat( t('mjchat.face')); //'换脸'
     try{
           let images= await localSaveAny( JSON.stringify( [message.data.sourceBase64,message.data.targetBase64 ] )  ) ;
           mlog('key', images );
@@ -81,7 +81,7 @@ async function onConversation() {
 
   }else if( message.action && message.action=='blend' ){
      // promptMsg.opt={  images: message.fileBase64 }
-     let promptMsg: Chat.Chat= getInitChat('混图');
+     let promptMsg: Chat.Chat= getInitChat(t('mjchat.blend') );//'混图'
      try{
           let images= await localSaveAny( JSON.stringify( message.data.base64Array )  ) ;
           mlog('key', images );
@@ -92,8 +92,19 @@ async function onConversation() {
      addChat(  +uuid, promptMsg );
 
     
-  }else if( message.action && message.action=='gpt.dall-e-3' ){ //gpt.dall-e-3
+  }else if( message.action && ['gpt.dall-e-3','shorten'].indexOf(message.action) >-1   ){ //gpt.dall-e-3 //subTas
     let promptMsg: Chat.Chat= getInitChat( message.data.prompt ); 
+    mlog( 'gpt.dall-e-3' ,  message.data.fileBase64 );
+    if(  message.data.fileBase64 &&  message.data.fileBase64.length>0 ){
+       // promptMsg.opt={  images: message.fileBase64 }
+       try{
+            let images= await localSaveAny( JSON.stringify(  {fileName:["a.jpg"], fileBase64:[ message.data.fileBase64]} )  ) ;
+            mlog('key', images );
+            promptMsg.opt= {images:[images]}
+       }catch(e){
+           mlog('localSaveAny error',e);
+       }
+    }
      addChat(  +uuid, promptMsg );
   }else if( message.drawText){
     let promptMsg: Chat.Chat= getInitChat(message.drawText)
@@ -101,7 +112,7 @@ async function onConversation() {
     if( message.fileBase64 && message.fileBase64.length>0 ){
        // promptMsg.opt={  images: message.fileBase64 }
        try{
-            let images= await localSaveAny( JSON.stringify( message.fileBase64)  ) ;
+            let images= await localSaveAny( JSON.stringify(  {fileName:["a.jpg"], fileBase64:[ message.data.fileBase64]} )  ) ;
             mlog('key', images );
             promptMsg.opt= {images:[images]}
        }catch(e){
@@ -125,12 +136,12 @@ async function onConversation() {
     options = { ...lastContext }
   let outMsg: Chat.Chat={
       dateTime: new Date().toLocaleString(),
-      text: message.action=='gpt.dall-e-3'?'请勿关闭! 图片生成中...':'提交中',
+      text: message.action=='gpt.dall-e-3'? t('mjchat.wait3'): t('mjchat.submiting'),
       loading: true,
       inversion: false,
       error: false,
       conversationOptions: null,
-      requestOptions: { prompt: '提交中', options: { ...options } },
+      requestOptions: { prompt:  t('mjchat.submiting'), options: { ...options } },
       uuid:+uuid,
       myid: `${Date.now()}`
       ,model:message.action=='gpt.dall-e-3'? message.data.model :'midjourney'
@@ -211,17 +222,17 @@ watch(()=>homeStore.myData.act,(n)=>{
     }
     if(n=='updateChat'){
         let dchat= homeStore.myData.actData as Chat.Chat;
-        //mlog('updateChat', dchat );
+        mlog("动作更新",'updateChat' ,  dchat.uuid,dchat.index );
         if(  dchat.uuid && dchat.index ) {
             dchat.dateTime= new Date().toLocaleString();
             updateChat( +dchat.uuid, +dchat.index, dchat );
-            mlog('updateChat',dchat.model , dchat.opt?.progress, dchat.opt?.imageUrl  );
+            mlog('updateChat 动作更新',dchat.model , dchat.opt?.progress, dchat.opt?.imageUrl  );
             if( dchat.opt?.progress&& dchat.opt?.progress=='100%' && dchat.opt?.imageUrl ){
                // url2base64(dchat.opt?.imageUrl ,'img:'+dchat.mjID ).then(()=>{}).catch((e)=>mlog('url2base64 error',e));
                //homeStore.setMyData{{act}}
                homeStore.setMyData({act:'mjReload', actData:{mjID:dchat.mjID,noShow:true} })
                toBottom();
-            }else if(  (dchat.model=='dall-e-2' || dchat.model=='dall-e-3')   && dchat.opt?.imageUrl ){
+            }else if(  dchat.model && ( isDallImageModel(dchat.model) )   && dchat.opt?.imageUrl ){
                 homeStore.setMyData({act:'dallReload', actData:{myid:dchat.myid,noShow:true} });
                 toBottom();
             }
@@ -229,7 +240,7 @@ watch(()=>homeStore.myData.act,(n)=>{
         }
     }
     
-});
+},{deep:true});
 
 const toBottom= ()=>{
   setTimeout(() => {
